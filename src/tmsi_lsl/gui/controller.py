@@ -605,6 +605,17 @@ class AppController(QObject):
                     f"已应用采样率：基准 {base_rate} Hz → 设备当前 {applied_rate} Hz"
                     + (f"，{active} 个通道" if active else ""),
                 )
+
+        reference = str(payload.get("reference") or "")
+        if reference:
+            auto_reference = str(payload.get("auto_reference") or "")
+            self._stream_info_text += f" · ref {reference}/{auto_reference}"
+            if f"ref {reference}" not in self._device_text:
+                self._device_text += f" · ref {reference}/{auto_reference}"
+            self._add_message(
+                "info",
+                f"参考方式：{reference}（自动回退 {auto_reference}）",
+            )
         self._pending = None
         self._set_busy(False)
         self.connectionChanged.emit()

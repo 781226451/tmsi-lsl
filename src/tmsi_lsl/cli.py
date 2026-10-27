@@ -210,6 +210,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="log the interval between SDK data fetches to CSV and print a "
         "summary at exit (useful to compare Python versions / machines)",
     )
+    config.add_argument(
+        "--reference",
+        choices=("common", "average"),
+        default="common",
+        help="reference applied to the UNI channels before measuring: 'common' "
+        "(default) references them against the CREF electrode, 'average' would "
+        "apply a common average reference instead. The auto-reference fallback "
+        "is always pinned to 'fixed' so a loose CREF never switches it silently",
+    )
 
     tools = parser.add_argument_group("tools")
     tools.add_argument(
@@ -511,6 +520,15 @@ def _run(args: argparse.Namespace) -> int:
         note = _rate_note(active)
         if note:
             _LOG.warning("%s", note)
+
+        try:
+            references = source.ensure_reference(args.reference, auto="fixed")
+        except SourceError as exc:
+            raise SourceError(f"could not pin the reference: {exc}") from exc
+        _print(
+            f"Reference: {references['reference']} "
+            f"(auto-reference: {references['autoreference']})"
+        )
 
         if args.record_timing:
             if args.simulate:

@@ -61,6 +61,16 @@ class SimulatedChannel:
         return f"SimulatedChannel({self._index}, {self._name!r})"
 
 
+class _Named:
+    """Minimal stand-in for the SDK's ``RefMethod`` / ``AutoRefMethod`` enums."""
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid
+        return f"<{self.name}>"
+
+
 class SimulatedSaga:
     """Fake device producing sine waves and a square-wave trigger channel."""
 
@@ -82,6 +92,8 @@ class SimulatedSaga:
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
         self._state = DeviceState.disconnected
+        self._reference = "Common"
+        self._auto_reference = "Fixed"
 
         self._channels: list[SimulatedChannel] = [
             SimulatedChannel(0, "CREF", ChannelType.UNI, "uV", divider=0)
@@ -138,6 +150,23 @@ class SimulatedSaga:
             "device_sampling_rate": self._sampling_frequency,
             "base_sampling_rate": self._base_sample_rate,
         }
+
+    def get_device_references(self) -> dict:
+        return {
+            "reference": _Named(self._reference),
+            "autoreference": _Named(self._auto_reference),
+        }
+
+    def set_device_references(self, reference_method=None, auto_reference_method=None) -> None:
+        if reference_method is not None:
+            self._reference = self._reference_name(reference_method)
+        if auto_reference_method is not None:
+            self._auto_reference = self._reference_name(auto_reference_method)
+
+    @staticmethod
+    def _reference_name(value) -> str:
+        name = getattr(value, "name", None)
+        return str(name if name is not None else value).strip().capitalize()
 
     def set_device_active_channels(self, indices, activate: bool) -> None:
         for index in indices:

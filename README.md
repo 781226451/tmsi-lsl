@@ -271,6 +271,26 @@ uv run tmsi-lsl --channels "type:UNI" --base-sample-rate 4096 --divider 2
 > **注意**：LSL 流只能声明一个采样率。如果不同通道类型的 divider 不同（例如 UNI 500 Hz、status 4000 Hz），
 > 程序会给出告警，因为下游会按单一采样率解释多路数据。需要严格对齐时请统一使用 `--divider`。
 
+### 参考方式（REF）
+
+程序默认把参考**钉在 `common` + `fixed`**：
+
+* `common`：每个 UNI 通道都相对 **CREF 电极**（单独参考）计算，**不使用公共平均参考**；
+* `fixed`：即使 CREF 电极松脱，也**不会**自动回退到 average（避免数据含义悄悄变化）。
+
+写入前会先读设备：**已经是 common/fixed 时不做任何写入**，所以就绪状态完全不变；只有设备上被设成平均参考时才纠正一次，
+并在命令行/消息面板报告。设备当前值也可以直接查：
+
+```powershell
+uv run tmsi-lsl --duration 2          # 输出里会有一行：Reference: common (auto-reference: fixed)
+```
+
+需要显式用平均参考（默认不建议）时：`--reference average`（自动回退仍固定为 `fixed`）。
+参考写入和采样率一样，只能在「已连接但未采样」时进行；GUI 在开始推流前会自动执行这一步。
+
+> 注意：CREF **通道**（0 号）仍会被 `ref64` 预设采集进流里，用于事后重参考或检查电极接触；
+> 这与"电气参考方式"是两件事。
+
 ## 取数间隔诊断（`--record-timing`）
 
 SDK 的采样线程按 `TMSiThread(pause=0.01)` 每 10 ms 调一次 `device.get_device_data()`。

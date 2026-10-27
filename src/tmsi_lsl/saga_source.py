@@ -118,6 +118,12 @@ def _tmsi_error_code(exc: Exception) -> str:
     return getattr(code, "name", str(code))
 
 
+def _enum_name(value) -> str:
+    """``RefMethod.Common`` / ``"Common"`` / ``0`` -> ``"common"``."""
+    name = getattr(value, "name", None)
+    return str(name if name is not None else value).strip().lower()
+
+
 class SagaSource:
     """A single SAGA device, from discovery to measurement.
 
@@ -448,6 +454,68 @@ class SagaSource:
                 f"could not start the measurement ({_tmsi_error_code(exc)}): {exc}"
             ) from exc
         self._sampling = True
+
+    def reference(self) -> dict[str, str]:
+        """Read the device's reference configuration.
+
+        :return: ``{"reference": "common"|"average", "autoreference": "fixed"|"average"}``
+        """
+        device = self._require_device()
+        try:
+            refs = device.get_device_references()
+        except self._sdk["TMSiError"] as exc:
+            raise SourceError(f"could not read the reference: {exc}") from exc
+        return {
+            "reference": _enum_name(refs.get("reference")),
+            "autoreference": _enum_name(refs.get("autoreference")),
+        }
+
+    def ensure_reference(
+        self,
+        method: str = "common",
+        auto: str = "fixed",
+    ) -> dict[str, str]:
+        """Make sure the device uses the requested reference (default: CREF only).
+
+        ``common`` references every UNI channel against the CREF electrode;
+        ``average`` would apply a common average reference instead.  The write
+        only happens when the device differs, so a device that already runs
+        ``common``/``fixed`` is left untouched.
+
+        Like every other configuration change this is only possible while the
+        device is open but not sampling.
+        """
+        method = method.strip().lower()
+        auto = auto.strip().lower()
+        if method not in ("common", "average"):
+            raise SourceError(f"unsupported reference method {method!r}")
+        if auto not in ("fixed", "average"):
+            raise SourceError(f"unsupported auto-reference method {auto!r}")
+
+        current = self.reference()
+        if current["reference"] == method and current["autoreference"] == auto:
+            return current
+
+        if self._sampling:
+            raise SourceError("cannot change the reference while sampling")
+
+        from TMSiSDK.device.devices.saga.saga_API_enums import (  # noqa: PLC0415
+            AutoRefMethod,
+            RefMethod,
+        )
+
+        try:
+            self._require_device().set_device_references(
+                reference_method=getattr(RefMethod, method.capitalize()),
+                auto_reference_method=getattr(AutoRefMethod, auto.capitalize()),
+            )
+        except self._sdk["TMSiError"] as exc:
+            raise SourceError(
+                f"could not set the reference ({_tmsi_error_code(exc)}): {exc}"
+            ) from exc
+
+        self._summary = self._read_summary()
+        return self.reference()
 
     def enable_fetch_timing(
         self,

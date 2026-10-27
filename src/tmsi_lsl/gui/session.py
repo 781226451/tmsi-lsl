@@ -163,6 +163,10 @@ class DeviceSession(QObject):
                     divider=divider or None,
                 )
 
+            # Keep every UNI channel referenced to the CREF electrode: no average
+            # reference, and no silent fallback when CREF comes loose.
+            references = source.ensure_reference("common", auto="fixed")
+
             stream = LslStream(
                 name=str(config.get("lsl_name") or "TMSi SAGA"),
                 lsl_offset=float(config.get("lsl_offset", 0.0335)),
@@ -186,6 +190,8 @@ class DeviceSession(QObject):
                     "device_sampling_rate": float(summary.sampling_frequency),
                     "device_base_rate": int(summary.base_sample_rate),
                     "device_num_active": int(summary.num_active_channels),
+                    "reference": references["reference"],
+                    "auto_reference": references["autoreference"],
                 }
             )
         except Exception as exc:  # noqa: BLE001 - reported to the UI
