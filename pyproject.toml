@@ -3,12 +3,12 @@ name = "tmsi-lsl"
 version = "0.1.0"
 description = "Stream TMSi SAGA data to Lab Streaming Layer (LSL) from the command line."
 readme = "README.md"
-requires-python = ">=3.10,<3.11"
+requires-python = ">=3.11,<3.12"
 license = { text = "MIT" }
 authors = [{ name = "tmsi-lsl contributors" }]
 keywords = ["tmsi", "saga", "eeg", "lsl", "labstreaminglayer", "streaming"]
 classifiers = [
-    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "Operating System :: Microsoft :: Windows",
     "Topic :: Scientific/Engineering :: Medical Science Apps.",
 ]
