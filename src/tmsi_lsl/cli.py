@@ -215,9 +215,16 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("common", "average"),
         default="common",
         help="reference applied to the UNI channels before measuring: 'common' "
-        "(default) references them against the CREF electrode, 'average' would "
-        "apply a common average reference instead. The auto-reference fallback "
-        "is always pinned to 'fixed' so a loose CREF never switches it silently",
+        "(default) references them against the CREF electrode, 'average' applies "
+        "a common average reference instead",
+    )
+    config.add_argument(
+        "--auto-reference",
+        choices=("fixed", "average"),
+        default="fixed",
+        help="what the device falls back to when the common (CREF) mode is "
+        "disconnected: 'fixed' (default) never switches, 'average' switches to "
+        "the common average reference",
     )
 
     tools = parser.add_argument_group("tools")
@@ -522,7 +529,7 @@ def _run(args: argparse.Namespace) -> int:
             _LOG.warning("%s", note)
 
         try:
-            references = source.ensure_reference(args.reference, auto="fixed")
+            references = source.ensure_reference(args.reference, auto=args.auto_reference)
         except SourceError as exc:
             raise SourceError(f"could not pin the reference: {exc}") from exc
         _print(
