@@ -20,7 +20,6 @@ htmlcov/
 lint.txt
 .idea/
 *.iml
-timing.csv
 
 # Machine-local GUI settings (settings.example.toml is tracked)
 /settings.toml

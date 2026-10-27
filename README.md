@@ -24,7 +24,6 @@
 │   ├── saga_source.py          # 设备发现/打开/通道配置/启动停止的封装
 │   ├── channels.py             # 通道列表、选通语法解析与选择逻辑（不依赖 SDK）
 │   ├── lsl_stream.py           # 基于 SDK LSLWriter 的 LSL outlet + 吞吐统计
-│   ├── timing.py               # 取数间隔记录（包装 get_device_data，不改 SDK）
 │   ├── simulator.py            # 无硬件时的模拟 SAGA 设备
 │   ├── sdk_bootstrap.py        # 定位并加载 tmsi-python-interface-main
 │   └── gui/                    # Qt Quick 图形界面
@@ -36,7 +35,6 @@
 ├── tests/                      # 单元测试 + LSL 端到端 + GUI 自检
 ├── scripts/
 │   ├── probe_connections.py    # 逐个接口组合探测设备（排查“找不到设备”）
-│   ├── sleep_precision.py      # 对比 time.sleep 精度（3.10 vs 3.11 / 有无 LSL）
 │   └── gui_screenshot.py       # 无显示器渲染界面截图
 ├── docs/                       # 本地界面截图（不入库）
 └── tmsi-python-interface-main/ # 官方 TMSi Python Interface（未修改）
@@ -302,139 +300,6 @@ SDK 里对应的枚举：`RefMethod{Common=0, Average=1}`、`AutoRefMethod{Fixed
 
 > 注意：CREF **通道**（0 号）仍会被 `ref64` 预设采集进流里，用于事后重参考或检查电极接触；
 > 这与"电气参考方式"是两件事。
-
-## 取数间隔诊断（`--record-timing`）
-
-SDK 的采样线程按 `TMSiThread(pause=0.01)` 每 10 ms 调一次 `device.get_device_data()`。
-`--record-timing FILE.csv` 会在**不修改 vendor SDK** 的前提下包装该方法（只替换设备实例上的属性），
-记录每次调用的开始时刻、耗时、与上一次的间隔、以及本次返回的 sample set 数，退出时打印统计：
-
-```powershell
-uv run tmsi-lsl --duration 30 --record-timing timing.csv
-```
-
-```
-SDK data fetch timing
-  fetches       : 467 over 5.028 s (92.7 Hz)
-  interval (ms) : mean 10.79  p50 10.97  p95 11.10  p99 11.33  max 11.56  min 10.03
-  call (ms)     : mean 0.02  p95 0.04  max 0.10
-  sample sets   : 9,112 total (156 empty fetches)
-  csv           : timing.csv
-```
-
-CSV 列：`index,t_start_s,duration_ms,interval_ms,num_sets`（间隔为空表示第一次调用）。
-也可以编程调用：`recorder = source.enable_fetch_timing("timing.csv")`（须在 `start()` 之前）。
-
-### Python 3.10 与 3.11 的 `time.sleep` 精度
-
-Windows 上 CPython ≤ 3.10 会把 `time.sleep()` 向上取整到 ~15.6 ms 的系统节拍，3.11 改用高精度可等待定时器：
-
-| `time.sleep` | 3.10.22 空进程 | 3.10.22 + LSL outlet | 3.11.17 空进程 |
-| --- | --- | --- | --- |
-| 1 ms | **15.74 ms** | — | 1.53 ms |
-| 5 ms | **15.75 ms** | — | 5.36 ms |
-| 10 ms | **15.76 ms** | 10.26 ms | 10.34 ms |
-
-**但本程序在两个版本上几乎没有差别**：liblsl 只要真正建立一条 stream（`StreamOutlet` 或 `StreamInlet`，即启动其内部线程）
-就会把进程的 Windows 定时器精度提到 1 ms，于是 `time.sleep(0.01)` 不再被 15.6 ms 节拍拉长。
-本程序在 `start_measurement()` 之前已经建好 outlet，所以采样线程实测为 —— 真机 5 秒：
-Python 3.11 → 92.7 Hz / 平均 10.79 ms，Python 3.10 → 91.1 Hz / 平均 10.98 ms，两者 LSL 帧率都稳定在 ~2000 帧/秒。
-
-三组对照（Python 3.10，`time.sleep(0.01)` 实测）：
-
-| 进程里有什么 | 实测 |
-| --- | --- |
-| 只有解释器 | **15.76 ms** |
-| `import pylsl`（未建 stream） | 15.72 ms |
-| 加载 TMSi DLL（未开始采样） | 15.78 ms |
-| 建了 `StreamOutlet` | 10.26 ms |
-| 建了 `StreamInlet` | 10.39 ms |
-
-再补两个同机实测（Python 3.10），说明这个"请求"的性质：
-
-* **请求是"粘"的**：创建 outlet 后测 10.21 ms，`del outlet` + `gc.collect()` 之后仍是 10.23 ms
-  ——liblsl 只请求不归还，进程整个生命周期都保持 1 ms 节拍；
-* **请求按进程生效**：另一个进程持有 outlet 时，本进程（没有任何 stream）仍是 15.49 ms
-  ——Windows 10 2004 起定时器精度请求不再全局共享。
-
-如果想复现上面两组对比：
-
-```powershell
-uv run python scripts/sleep_precision.py                                   # 当前解释器（无 LSL）
-uv run --python 3.10 --no-project --with pylsl python scripts/sleep_precision.py --outlet
-```
-
-> 也就是说：**空脚本里 3.10 的 sleep 确实差 5.4 ms，但在本程序里被 liblsl 建立的 stream 掩盖了**。
-> 若以后有路径在取数时尚未建立任何 LSL stream（例如只用 SDK 不推流），3.10 上仍会遇到 ~15.6 ms 的节拍。
-> 注意这只是消除了"被拉长"，并**不等于 3.10 与 3.11 等价**——接收端实测的抖动长尾仍与发送端版本相关（见上一节表格）。
-
-### 不开 LSL 时的取数间隔（`scripts/fetch_only_probe.py`）
-
-要看清"没有 LSL 掩盖"的真实表现，就直接跑 SDK 采样、不建任何 stream：
-
-```powershell
-uv run python scripts/fetch_only_probe.py --duration 6                       # 3.11
-uv run --python 3.10 --no-project python scripts/fetch_only_probe.py --duration 6   # 3.10
-```
-
-（该脚本不需要 pylsl、也不需要 Qt，只用到 SDK 与标准库。）
-
-真机实测（SAGA DR，67 通道 @ 2000 Hz，各 6 秒）：
-
-| 指标 | Python 3.11.17 | Python 3.10.22 |
-| --- | --- | --- |
-| 取数频率 | **93.7 Hz** | **64.1 Hz** |
-| 间隔 mean / p95 / max | **10.67 / 11.13 / 11.51 ms** | **15.59 / 16.17 / 17.10 ms** |
-| 每次样本数（含空读 / 仅非空） | 20.5 / 29.9 | 30.0 / 31.9 |
-| 样本吞吐 | 1,927 sets/s | 1,931 sets/s |
-| 单次取数耗时 mean | 0.03 ms | 0.29 ms |
-| 空读比例 | 31.4% | 6.0% |
-
-解读：
-
-* **间隔差 4.9 ms（46%）**，正是 15.6 ms 节拍与 1 ms 节拍的差别；
-* **吞吐相同**（~1,930 sets/s）：设备内部缓冲把差异吸收了，所以"不丢数，但取数更粗"；
-* 设备内部块的粒度约 **30 个 sample set**（≈15 ms @2000 Hz）：3.11 以 93.7 Hz 轮询，比块到达更密，所以 31% 是空读；3.10 的 64 Hz 恰好贴近块率，空读只有 6%；
-* 这就是"没有 LSL outlet 抬高定时器"时的真实表现，也是为什么**只用 SDK、不推流**的路径在 3.10 上会慢一拍。
-
-### 接收端分块与时间戳（`scripts/lsl_receive_probe.py`）
-
-`--record-timing` 记录的是 **SDK 侧**取数；这个脚本记录 **消费端**：每次 `pull_chunk` 拿到多少样本、
-LSL 时间戳是否连续——即 LabRecorder / MNE-LSL 实际看到的样子。
-
-```powershell
-# 终端 1：发送端
-uv run tmsi-lsl --duration 20
-
-# 终端 2：接收端探针
-uv run python scripts/lsl_receive_probe.py --duration 8 --csv receive.csv
-```
-
-`--min-samples` 决定「每次获取」的含义：
-
-| 取值 | 行为 |
-| --- | --- |
-| `1`（默认） | 有数据就返回 → 看到**发送端**真实分块粒度 |
-| `0` | 攒满 `--max-samples`（默认 1024）或 `--pull-timeout` 才返回 → 看到**接收端**的批量拉取行为 |
-
-CSV 列：`index,pulled_at_s,gap_ms,samples,first_ts,last_ts,span_ms`。
-统计里有 `worst ts gap`：时间戳步长与「上一块样本数 ÷ 采样率」的最大偏差，用来判断是否掉样本。
-
-**交叉实测**（真机 67 通道 @ 2000 Hz，8 秒，`min_samples=1`）：
-
-| 发送端 | 接收端 | pulls | 样本/秒 | 每次样本 mean / p95 / max | pull 间隔 mean / p95 | 时间戳最大偏差 |
-| --- | --- | --- | --- | --- | --- | --- |
-| 3.11 | 3.11 | 499 | 2004 | 28.7 / 36 / 48 | 14.34 / 21.31 ms | 19.7 ms |
-| 3.10 | 3.10 | 443 | 1998 | 31.4 / 62 / 79 | 15.77 / 30.86 ms | 29.8 ms |
-| 3.11 | 3.10 | 466 | 2005 | 30.5 / 38 / 64 | 15.23 / 21.29 ms | 21.5 ms |
-| 3.10 | 3.11 | 466 | 2000 | 31.6 / 57 / 72 | 15.83 / 31.31 ms | 30.4 ms |
-
-结论：
-
-* 四个组合的**吞吐都是 ~2000 样本/秒**，没有丢数；
-* 分块的**抖动跟发送端版本走**（3.11 发送端 p95 36–38 样本，3.10 发送端 57–62），与接收端无关；
-* 中位数都是 ~32 样本（≈16 ms），说明 liblsl 交付给 Python 的粒度约 15 ms，比发送端 ~10.8 ms 的推送间隔更粗；
-* 3.10 发送端偶发 ~30 ms 的交付间隔（≈60 样本），即下游会看到轻微的时间戳"台阶"，但不影响总样本数。
 
 ## 无硬件演练（`--simulate`）
 

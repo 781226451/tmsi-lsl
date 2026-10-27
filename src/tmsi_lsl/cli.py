@@ -204,12 +204,6 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="SECONDS",
         help="how often to print throughput; 0 disables (default: %(default)s)",
     )
-    config.add_argument(
-        "--record-timing",
-        metavar="CSV",
-        help="log the interval between SDK data fetches to CSV and print a "
-        "summary at exit (useful to compare Python versions / machines)",
-    )
 
     tools = parser.add_argument_group("tools")
     tools.add_argument(
@@ -482,7 +476,6 @@ def _run(args: argparse.Namespace) -> int:
     source, summary = _make_source(args)
     stream: LslStream | None = None
     stream_info: LslStreamInfo | None = None
-    recorder = None
     try:
         _print(f"Connected: {_describe_summary(summary)}")
 
@@ -520,16 +513,6 @@ def _run(args: argparse.Namespace) -> int:
         except SourceError as exc:
             raise SourceError(f"could not pin the reference: {exc}") from exc
 
-        if args.record_timing:
-            if args.simulate:
-                _LOG.warning(
-                    "the simulated device never calls get_device_data; "
-                    "--record-timing is ignored in simulation mode"
-                )
-            else:
-                recorder = source.enable_fetch_timing(args.record_timing)
-                _print(f"Recording SDK fetch timing to {args.record_timing}")
-
         stream = LslStream(name=args.lsl_name, lsl_offset=args.lsl_offset)
         stream_info = stream.open(source.device)
         _print(
@@ -561,10 +544,6 @@ def _run(args: argparse.Namespace) -> int:
         return EXIT_OK
     finally:
         _shutdown(source, stream)
-        if recorder is not None:
-            recorder.close()
-            _print("")
-            _print(recorder.summary())
 
 
 # ------------------------------------------------------------------------ main
