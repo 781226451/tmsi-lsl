@@ -303,9 +303,20 @@ Windows 上 CPython ≤ 3.10 会把 `time.sleep()` 向上取整到 ~15.6 ms 的�
 | 5 ms | **15.75 ms** | — | 5.36 ms |
 | 10 ms | **15.76 ms** | 10.26 ms | 10.34 ms |
 
-**但本程序在两个版本上几乎没有差别**：`pylsl` 创建 `StreamOutlet` 后（liblsl 的线程）会把进程定时器精度提升到 1 ms，
-所以采样线程实测为 —— 真机 5 秒：Python 3.11 → 92.7 Hz / 平均 10.79 ms，Python 3.10 → 91.1 Hz / 平均 10.98 ms，
-两者 LSL 帧率都稳定在 ~2000 帧/秒。
+**但本程序在两个版本上几乎没有差别**：liblsl 只要真正建立一条 stream（`StreamOutlet` 或 `StreamInlet`，即启动其内部线程）
+就会把进程的 Windows 定时器精度提到 1 ms，于是 `time.sleep(0.01)` 不再被 15.6 ms 节拍拉长。
+本程序在 `start_measurement()` 之前已经建好 outlet，所以采样线程实测为 —— 真机 5 秒：
+Python 3.11 → 92.7 Hz / 平均 10.79 ms，Python 3.10 → 91.1 Hz / 平均 10.98 ms，两者 LSL 帧率都稳定在 ~2000 帧/秒。
+
+三组对照（Python 3.10，`time.sleep(0.01)` 实测）：
+
+| 进程里有什么 | 实测 |
+| --- | --- |
+| 只有解释器 | **15.76 ms** |
+| `import pylsl`（未建 stream） | 15.72 ms |
+| 加载 TMSi DLL（未开始采样） | 15.78 ms |
+| 建了 `StreamOutlet` | 10.26 ms |
+| 建了 `StreamInlet` | 10.39 ms |
 
 如果想复现上面两组对比：
 
@@ -314,8 +325,9 @@ uv run python scripts/sleep_precision.py                                   # 当
 uv run --python 3.10 --no-project --with pylsl python scripts/sleep_precision.py --outlet
 ```
 
-> 也就是说：**空脚本里 3.10 的 sleep 确实差 5.4 ms，但在本程序里被 LSL outlet 掩盖了**。
-> 若以后有路径在建模/取数时尚未创建 outlet（例如只用 SDK 不推流），3.10 上仍会遇到 ~15.6 ms 的节拍。
+> 也就是说：**空脚本里 3.10 的 sleep 确实差 5.4 ms，但在本程序里被 liblsl 建立的 stream 掩盖了**。
+> 若以后有路径在取数时尚未建立任何 LSL stream（例如只用 SDK 不推流），3.10 上仍会遇到 ~15.6 ms 的节拍。
+> 注意这只是消除了"被拉长"，并**不等于 3.10 与 3.11 等价**——接收端实测的抖动长尾仍与发送端版本相关（见上一节表格）。
 
 ### 接收端分块与时间戳（`scripts/lsl_receive_probe.py`）
 
