@@ -71,16 +71,25 @@ def main() -> int:
         )
 
     coarse = statistics.mean(measure(0.01, 20)) > 12.0
+    modern = sys.version_info >= (3, 11)
     print()
     if coarse:
         print(
-            "verdict: sleeps collapse to the ~15.6 ms timer tick "
-            "(typical for CPython < 3.11 on Windows without an LSL outlet)"
+            "verdict: sleeps collapse to the ~15.6 ms timer tick. On CPython < 3.11 "
+            "nothing in this process raised the timer; create an LSL stream (or run "
+            "3.11+) to see the difference."
+        )
+    elif modern:
+        print("verdict: ~1 ms resolution - provided by CPython >= 3.11 itself")
+    elif args.outlet:
+        print(
+            "verdict: ~1 ms resolution - raised by the LSL outlet created above "
+            "(CPython < 3.11 relies on that request)"
         )
     else:
         print(
-            "verdict: ~1 ms resolution — either CPython >= 3.11, or something in "
-            "this process raised the timer (e.g. an LSL outlet)"
+            "verdict: ~1 ms resolution - something in this process raised the timer, "
+            "although no LSL outlet was created here"
         )
     return 0
 
