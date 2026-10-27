@@ -533,3 +533,12 @@ git push -u origin main
 | 采样率 | `dev.set_device_sampling_config(base_sample_rate=..., channel_type=..., channel_divider=...)` |
 | 采集 | `dev.start_measurement(MeasurementType.SAGA_SIGNAL)` / `dev.stop_measurement()` |
 | 推流 | `FileWriter(FileFormat.lsl, name).open(dev)`（内部注册 `SampleDataServer` 消费者） |
+
+## 许可证
+
+本项目（`src/`、`scripts/`、`tests/` 等）采用 **MIT** 许可证，见 [LICENSE](LICENSE)。
+
+`tmsi-python-interface-main/` 是 TMSi 官方的 **TMSi Python Interface**（(c) Twente Medical Systems
+International B.V.），按 **Apache License 2.0** 分发，全文见
+[tmsi-python-interface-main/LICENSE.txt](tmsi-python-interface-main/LICENSE.txt)。
+该目录未做任何修改，仅作为依赖被 `sys.path` 引入；使用/分发时请遵守 Apache-2.0 的署名要求。
