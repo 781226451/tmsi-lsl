@@ -112,6 +112,7 @@ class DeviceSession(QObject):
             self.deviceConnected.emit(
                 {
                     "mode": mode,
+                    "reference": source.reference(),
                     "summary": {
                         "name": summary.name,
                         "serial": summary.serial_number,

@@ -40,6 +40,27 @@ __all__ = ["AppController"]
 
 _MAX_MESSAGES = 100
 
+#: How the reference configuration is described in the UI.
+_REFERENCE_DETAIL = {
+    "common": "CREF 单独参考",
+    "average": "公共平均参考",
+}
+
+
+def _reference_label(reference: dict | None) -> str:
+    """Format ``{"reference": ..., "autoreference": ...}`` for the header."""
+    if not reference:
+        return ""
+    method = str(reference.get("reference") or "").lower()
+    if not method:
+        return ""
+    auto = str(reference.get("autoreference") or "").lower()
+    detail = _REFERENCE_DETAIL.get(method, method)
+    text = f"参考 {method}（{detail}）"
+    if auto:
+        text += f" · 自动回退 {auto}"
+    return text
+
 
 class AppController(QObject):
     """State + commands exposed to QML as the ``app`` context property."""
@@ -70,6 +91,7 @@ class AppController(QObject):
         self._status_text = "就绪"
         self._status_kind = "info"
         self._device_text = "未连接"
+        self._reference_text = ""
         self._stats_text = "—"
         self._stream_info_text = ""
         self._connected = False
@@ -143,6 +165,11 @@ class AppController(QObject):
         return self._device_text
 
     deviceText = Property(str, _get_device_text, notify=connectionChanged)
+
+    def _get_reference_text(self) -> str:
+        return self._reference_text
+
+    referenceText = Property(str, _get_reference_text, notify=connectionChanged)
 
     def _get_connected(self) -> bool:
         return self._connected
@@ -551,6 +578,7 @@ class AppController(QObject):
             + f" · 设备采样率 {summary.get('sampling_rate')} Hz"
             + f" · {summary.get('dr_interface')}/{summary.get('ds_interface')}"
         )
+        self._reference_text = _reference_label(payload.get("reference"))
         self._connected = True
         self._pending = None
         self._set_busy(False)
@@ -565,6 +593,7 @@ class AppController(QObject):
         self._device_sampling_rate = 0
         self._model.set_locked(False)
         self._device_text = "未连接"
+        self._reference_text = ""
         self._stream_info_text = ""
         self._stats_text = "—"
         self._pending = None
@@ -609,13 +638,10 @@ class AppController(QObject):
         reference = str(payload.get("reference") or "")
         if reference:
             auto_reference = str(payload.get("auto_reference") or "")
-            self._stream_info_text += f" · ref {reference}/{auto_reference}"
-            if f"ref {reference}" not in self._device_text:
-                self._device_text += f" · ref {reference}/{auto_reference}"
-            self._add_message(
-                "info",
-                f"参考方式：{reference}（自动回退 {auto_reference}）",
+            self._reference_text = _reference_label(
+                {"reference": reference, "autoreference": auto_reference}
             )
+            self._add_message("info", self._reference_text)
         self._pending = None
         self._set_busy(False)
         self.connectionChanged.emit()
@@ -650,6 +676,7 @@ class AppController(QObject):
         if action == "connect":
             self._connected = False
             self._device_text = "未连接"
+            self._reference_text = ""
         if action in {"start", "stop", "disconnect", "restart"} or not self._connected:
             self._streaming = False
             self._model.set_locked(False)

@@ -273,36 +273,30 @@ uv run tmsi-lsl --channels "type:UNI" --base-sample-rate 4096 --divider 2
 
 ### 参考方式（REF）
 
-参考由**两个维度**组成，共 4 种组合：
+参考方式**固定为 `common` + `fixed`**，不提供命令行开关：
 
-| 选项 | 取值 | 含义 |
+* `common`：每个 UNI 通道相对 **CREF 电极**（单独参考），**不使用公共平均参考**；
+* `fixed`：CREF 电极松动时**也不会**自动切换参考方式（避免数据含义悄悄改变）。
+
+设备一致时程序**不写任何配置**；只有设备被设成别的参考方式时，才会在开始推流前纠正一次。
+**参考模式只在 GUI 顶部显示**（`参考 common（CREF 单独参考）· 自动回退 fixed`），消息面板同时记一条；
+CLI 不打印这一行。
+
+> 需要程序化查看/修改时用 `SagaSource.reference()` / `SagaSource.ensure_reference("common", auto="fixed")`。
+
+概念上参考有两个维度（仅供理解，本程序只用第一种组合）：
+
+| 维度 | 取值 | 含义 |
 | --- | --- | --- |
-| `--reference` | `common`（默认） | 每个 UNI 通道相对 **CREF 电极**（单独参考） |
-| | `average` | 公共平均参考（CAR），设备用全部 UNI 通道算平均 |
-| `--auto-reference` | `fixed`（默认） | common 模式断开时**不切换** |
-| | `average` | common 模式断开时自动切到 average |
-
-程序默认把参考**钉在 `common` + `fixed`**：单独参考电极、且 CREF 松脱也不会让数据含义悄悄变化。
-
-写入前会先读设备：**已经一致时不做任何写入**，所以就绪状态完全不变；只有设备值不同时才纠正一次，
-并在命令行/消息面板报告。设备当前值也可以直接查：
-
-```powershell
-uv run tmsi-lsl --duration 2          # 输出里会有一行：Reference: common (auto-reference: fixed)
-```
-
-常用的几种写法：
-
-```powershell
-uv run tmsi-lsl --reference common --auto-reference fixed    # 默认：CREF 单独参考，不回退
-uv run tmsi-lsl --reference average                          # 平均参考（CAR）
-uv run tmsi-lsl --reference common --auto-reference average  # CREF 断了自动切平均
-```
+| reference | `common` | 每个 UNI 通道相对 **CREF 电极** |
+| | `average` | 公共平均参考（CAR） |
+| auto-reference | `fixed` | 参考失效时**不切换** |
+| | `average` | 参考失效时自动切到 average |
 
 SDK 里对应的枚举：`RefMethod{Common=0, Average=1}`、`AutoRefMethod{Fixed=0, Average=1}`
 （`tmsi_device_enums` 里另有等价别名 `ReferenceMethod.common/average`、`ReferenceSwitch.fixed/auto`）。
 
-参考写入和采样率一样，只能在「已连接但未采样」时进行；GUI 在开始推流前固定按 `common/fixed` 执行这一步。
+参考写入和采样率一样，只能在「已连接但未采样」时进行；GUI 在开始推流前按 `common/fixed` 执行这一步。
 
 > 注意：CREF **通道**（0 号）仍会被 `ref64` 预设采集进流里，用于事后重参考或检查电极接触；
 > 这与"电气参考方式"是两件事。

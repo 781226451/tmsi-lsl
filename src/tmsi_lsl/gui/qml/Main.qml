@@ -139,6 +139,13 @@ ApplicationWindow {
                         elide: Text.ElideRight
                         Layout.maximumWidth: 620
                     }
+                    Label {
+                        objectName: "referenceLabel"
+                        text: app.referenceText
+                        visible: text.length > 0
+                        font.pixelSize: 12
+                        color: root.accentColor
+                    }
                 }
 
                 Item { Layout.fillWidth: true }

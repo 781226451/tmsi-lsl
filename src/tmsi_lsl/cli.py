@@ -210,22 +210,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="log the interval between SDK data fetches to CSV and print a "
         "summary at exit (useful to compare Python versions / machines)",
     )
-    config.add_argument(
-        "--reference",
-        choices=("common", "average"),
-        default="common",
-        help="reference applied to the UNI channels before measuring: 'common' "
-        "(default) references them against the CREF electrode, 'average' applies "
-        "a common average reference instead",
-    )
-    config.add_argument(
-        "--auto-reference",
-        choices=("fixed", "average"),
-        default="fixed",
-        help="what the device falls back to when the common (CREF) mode is "
-        "disconnected: 'fixed' (default) never switches, 'average' switches to "
-        "the common average reference",
-    )
 
     tools = parser.add_argument_group("tools")
     tools.add_argument(
@@ -528,14 +512,13 @@ def _run(args: argparse.Namespace) -> int:
         if note:
             _LOG.warning("%s", note)
 
+        # Fixed by design: every UNI channel stays referenced to the CREF
+        # electrode, with no silent fallback to an average reference.  The value
+        # is only surfaced in the GUI, not printed here.
         try:
-            references = source.ensure_reference(args.reference, auto=args.auto_reference)
+            source.ensure_reference("common", auto="fixed")
         except SourceError as exc:
             raise SourceError(f"could not pin the reference: {exc}") from exc
-        _print(
-            f"Reference: {references['reference']} "
-            f"(auto-reference: {references['autoreference']})"
-        )
 
         if args.record_timing:
             if args.simulate:
