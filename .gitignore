@@ -25,6 +25,9 @@ timing.csv
 # Machine-local GUI settings (settings.example.toml is tracked)
 /settings.toml
 
+# Local UI screenshots (they show the real device serial number)
+docs/
+
 # Vendored TMSi Python Interface: keep the code, skip the generated Sphinx docs
 # (~33 MB / 1000 HTML files that are not needed to run the program).
 tmsi-python-interface-main/Documentation/

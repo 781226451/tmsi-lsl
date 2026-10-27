@@ -38,7 +38,7 @@
 │   ├── probe_connections.py    # 逐个接口组合探测设备（排查“找不到设备”）
 │   ├── sleep_precision.py      # 对比 time.sleep 精度（3.10 vs 3.11 / 有无 LSL）
 │   └── gui_screenshot.py       # 无显示器渲染界面截图
-├── docs/                       # 界面截图
+├── docs/                       # 本地界面截图（不入库）
 └── tmsi-python-interface-main/ # 官方 TMSi Python Interface（未修改）
 ```
 
@@ -91,13 +91,8 @@ uv run tmsi-lsl-gui                       # 使用 ./settings.toml
 uv run tmsi-lsl-gui --settings lab.toml   # 指定设置文件
 ```
 
-![界面截图：真机 90 通道](docs/gui-device.png)
-
-![界面截图：真机推流中（67 通道 @ 2000 Hz）](docs/gui-device-streaming.png)
-
-![界面截图：8×8 电极矩阵视图](docs/gui-matrix.png)
-
-![界面截图：拖拽框选一片（R2C3–R4C5）](docs/gui-matrix-region.png)
+> 界面截图保存在本地 `docs/` 目录，**不随仓库分发**（其中含真实设备序列号）。
+> 可用 `scripts/gui_screenshot.py` 在本地重新生成。
 
 界面能力：
 
@@ -463,7 +458,7 @@ uv run pytest                 # 97 个测试：设置/选通/模型/矩阵交互
 # 界面无显示器自检（加载真实 QML，跑一遍模拟推流）
 uv run tmsi-lsl-gui --self-test
 
-# 重新生成文档截图（offscreen + 软件渲染）
+# 本地生成界面截图（写入 docs/，该目录不入库）
 uv run python scripts/gui_screenshot.py --simulate --out docs/gui-streaming.png
 uv run python scripts/gui_screenshot.py --demo-grid --view matrix --out docs/gui-matrix.png
 uv run python scripts/gui_screenshot.py --demo-grid --view matrix --region 2,3,4,5 \
@@ -493,9 +488,9 @@ QML 静态检查（`unqualified` 提示来自 `app` / `channelModel` / `channelF
 
 ## 版本管理
 
-仓库已初始化（`main` 分支），首次提交包含程序源码、测试、脚本、文档截图与 vendor 的 TMSi SDK **代码**。
+仓库已初始化（`main` 分支），首次提交包含程序源码、测试、脚本与 vendor 的 TMSi SDK **代码**。
 
-纳入版本控制：`src/`、`tests/`、`scripts/`、`docs/`、`README.md`、`pyproject.toml`、`uv.lock`、`.python-version`、
+纳入版本控制：`src/`、`tests/`、`scripts/`、`README.md`、`LICENSE`、`pyproject.toml`、`uv.lock`、`.python-version`、
 `settings.example.toml`、`tmsi-python-interface-main/`（除生成的文档）。
 
 **不**纳入（见 `.gitignore`）：
@@ -505,6 +500,7 @@ QML 静态检查（`unqualified` 提示来自 `app` / `channelModel` / `channelF
 | `.venv/` | 由 `uv sync` 重建 |
 | `__pycache__/`、`.pytest_cache/` | 生成物 |
 | `settings.toml` | 本机配置（含本机通道选择），示例见 `settings.example.toml` |
+| `docs/` | 本地界面截图，含真实设备序列号，不随仓库分发 |
 | `tmsi-python-interface-main/Documentation/` | 33 MB / 1000+ 生成的 Sphinx HTML，运行时用不到 |
 | `.acl-recovery/` | 权限修复的一次性备份 |
 
