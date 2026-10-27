@@ -336,6 +336,35 @@ uv run --python 3.10 --no-project --with pylsl python scripts/sleep_precision.py
 > 若以后有路径在取数时尚未建立任何 LSL stream（例如只用 SDK 不推流），3.10 上仍会遇到 ~15.6 ms 的节拍。
 > 注意这只是消除了"被拉长"，并**不等于 3.10 与 3.11 等价**——接收端实测的抖动长尾仍与发送端版本相关（见上一节表格）。
 
+### 不开 LSL 时的取数间隔（`scripts/fetch_only_probe.py`）
+
+要看清"没有 LSL 掩盖"的真实表现，就直接跑 SDK 采样、不建任何 stream：
+
+```powershell
+uv run python scripts/fetch_only_probe.py --duration 6                       # 3.11
+uv run --python 3.10 --no-project python scripts/fetch_only_probe.py --duration 6   # 3.10
+```
+
+（该脚本不需要 pylsl、也不需要 Qt，只用到 SDK 与标准库。）
+
+真机实测（SAGA DR，67 通道 @ 2000 Hz，各 6 秒）：
+
+| 指标 | Python 3.11.17 | Python 3.10.22 |
+| --- | --- | --- |
+| 取数频率 | **93.7 Hz** | **64.1 Hz** |
+| 间隔 mean / p95 / max | **10.67 / 11.13 / 11.51 ms** | **15.59 / 16.17 / 17.10 ms** |
+| 每次样本数（含空读 / 仅非空） | 20.5 / 29.9 | 30.0 / 31.9 |
+| 样本吞吐 | 1,927 sets/s | 1,931 sets/s |
+| 单次取数耗时 mean | 0.03 ms | 0.29 ms |
+| 空读比例 | 31.4% | 6.0% |
+
+解读：
+
+* **间隔差 4.9 ms（46%）**，正是 15.6 ms 节拍与 1 ms 节拍的差别；
+* **吞吐相同**（~1,930 sets/s）：设备内部缓冲把差异吸收了，所以"不丢数，但取数更粗"；
+* 设备内部块的粒度约 **30 个 sample set**（≈15 ms @2000 Hz）：3.11 以 93.7 Hz 轮询，比块到达更密，所以 31% 是空读；3.10 的 64 Hz 恰好贴近块率，空读只有 6%；
+* 这就是"没有 LSL outlet 抬高定时器"时的真实表现，也是为什么**只用 SDK、不推流**的路径在 3.10 上会慢一拍。
+
 ### 接收端分块与时间戳（`scripts/lsl_receive_probe.py`）
 
 `--record-timing` 记录的是 **SDK 侧**取数；这个脚本记录 **消费端**：每次 `pull_chunk` 拿到多少样本、
