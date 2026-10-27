@@ -318,6 +318,13 @@ Python 3.11 → 92.7 Hz / 平均 10.79 ms，Python 3.10 → 91.1 Hz / 平均 10.
 | 建了 `StreamOutlet` | 10.26 ms |
 | 建了 `StreamInlet` | 10.39 ms |
 
+再补两个同机实测（Python 3.10），说明这个"请求"的性质：
+
+* **请求是"粘"的**：创建 outlet 后测 10.21 ms，`del outlet` + `gc.collect()` 之后仍是 10.23 ms
+  ——liblsl 只请求不归还，进程整个生命周期都保持 1 ms 节拍；
+* **请求按进程生效**：另一个进程持有 outlet 时，本进程（没有任何 stream）仍是 15.49 ms
+  ——Windows 10 2004 起定时器精度请求不再全局共享。
+
 如果想复现上面两组对比：
 
 ```powershell
