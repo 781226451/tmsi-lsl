@@ -443,6 +443,36 @@ QML 静态检查（`unqualified` 提示来自 `app` / `channelModel` / `channelF
 架构要点：QML 只与 `AppController`（QML 属性 + 槽）和两个数据显示模型交互；所有 SDK 调用都在
 `DeviceSession` 所在的 `QThread` 里执行，通过队列化信号把结果送回界面线程。
 
+## 版本管理
+
+仓库已初始化（`main` 分支），首次提交包含程序源码、测试、脚本、文档截图与 vendor 的 TMSi SDK **代码**。
+
+纳入版本控制：`src/`、`tests/`、`scripts/`、`docs/`、`README.md`、`pyproject.toml`、`uv.lock`、`.python-version`、
+`settings.example.toml`、`tmsi-python-interface-main/`（除生成的文档）。
+
+**不**纳入（见 `.gitignore`）：
+
+| 路径 | 原因 |
+| --- | --- |
+| `.venv/` | 由 `uv sync` 重建 |
+| `__pycache__/`、`.pytest_cache/` | 生成物 |
+| `settings.toml` | 本机配置（含本机通道选择），示例见 `settings.example.toml` |
+| `tmsi-python-interface-main/Documentation/` | 33 MB / 1000+ 生成的 Sphinx HTML，运行时用不到 |
+| `.acl-recovery/` | 权限修复的一次性备份 |
+
+常用操作：
+
+```powershell
+git status                      # 看改动
+git add -A && git commit -m "…" # 提交
+git log --oneline --graph       # 历史
+git remote add origin <url>     # 需要备份/协作时再加远端
+git push -u origin main
+```
+
+> 提交身份当前是占位的仓库级配置（`tmsi-signal-source <tmsi-signal-source@localhost>`）。
+> 换成自己的：`git config user.name "你的名字"`、`git config user.email "you@example.com"`。
+
 ---
 
 底层调用到的 SDK 接口（`TMSiSDK/`）：
