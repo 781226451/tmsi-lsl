@@ -1,0 +1,55 @@
+[project]
+name = "tmsi-lsl"
+version = "0.1.0"
+description = "Stream TMSi SAGA data to Lab Streaming Layer (LSL) from the command line."
+readme = "README.md"
+requires-python = ">=3.10,<3.11"
+license = { text = "MIT" }
+authors = [{ name = "tmsi-lsl contributors" }]
+keywords = ["tmsi", "saga", "eeg", "lsl", "labstreaminglayer", "streaming"]
+classifiers = [
+    "Programming Language :: Python :: 3.10",
+    "Operating System :: Microsoft :: Windows",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+dependencies = [
+    "pylsl>=1.16.0",
+    "pyside6-essentials>=6.6",
+    "tomli>=2.0",
+]
+
+[project.scripts]
+tmsi-lsl = "tmsi_lsl.cli:main"
+tmsi-lsl-gui = "tmsi_lsl.gui.app:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tmsi_lsl"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+    "hardware: test needs a real TMSi SAGA device and the TMSi driver",
+]
+
+# Use the Tsinghua (TUNA) PyPI mirror as the default package index so that
+# `uv sync` / `uv lock` are fast on machines inside mainland China.
+# Point back at upstream PyPI with:  $env:UV_DEFAULT_INDEX = "https://pypi.org/simple"
+[[tool.uv.index]]
+name = "tsinghua"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true

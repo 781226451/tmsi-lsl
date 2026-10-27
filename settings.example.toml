@@ -1,0 +1,30 @@
+# tmsi-lsl settings
+# Written by the tmsi-lsl GUI; safe to edit by hand.
+
+schema_version = 1
+
+[device]
+# Data-recorder interface: "docked", "wifi" or "optical".
+dr_interface = "docked"
+# Docking-station interface: "usb", "network" or "none".
+ds_interface = "usb"
+# 0 = first discovered device.
+device_index = 0
+
+[channels]
+# Channel names that are gated in. Empty = keep the device setting.
+names = ["CREF", "UNI 01", "UNI 02", "UNI 03"]
+# 0-based indices, used as a fallback when a name no longer exists.
+indices = [0, 1, 2, 3]
+
+[sampling]
+# Base sample rate in Hz: 4000 or 4096.
+base_rate = 4096
+# Decimation divider: 1 / 2 / 4 / 8.
+divider = 2
+
+[lsl]
+# Name of the published LSL stream.
+name = "TMSi SAGA"
+# Latency offset advertised in the stream metadata (seconds).
+offset = 0.0335

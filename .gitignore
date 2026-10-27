@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Local artefacts
+*.log
+.acl-recovery/
+lint.txt
+
+# Machine-local GUI settings (settings.example.toml is tracked)
+/settings.toml
+
+# Vendored TMSi Python Interface: keep the code, skip the generated Sphinx docs
+# (~33 MB / 1000 HTML files that are not needed to run the program).
+tmsi-python-interface-main/Documentation/
