@@ -317,6 +317,45 @@ uv run --python 3.10 --no-project --with pylsl python scripts/sleep_precision.py
 > 也就是说：**空脚本里 3.10 的 sleep 确实差 5.4 ms，但在本程序里被 LSL outlet 掩盖了**。
 > 若以后有路径在建模/取数时尚未创建 outlet（例如只用 SDK 不推流），3.10 上仍会遇到 ~15.6 ms 的节拍。
 
+### 接收端分块与时间戳（`scripts/lsl_receive_probe.py`）
+
+`--record-timing` 记录的是 **SDK 侧**取数；这个脚本记录 **消费端**：每次 `pull_chunk` 拿到多少样本、
+LSL 时间戳是否连续——即 LabRecorder / MNE-LSL 实际看到的样子。
+
+```powershell
+# 终端 1：发送端
+uv run tmsi-lsl --duration 20
+
+# 终端 2：接收端探针
+uv run python scripts/lsl_receive_probe.py --duration 8 --csv receive.csv
+```
+
+`--min-samples` 决定「每次获取」的含义：
+
+| 取值 | 行为 |
+| --- | --- |
+| `1`（默认） | 有数据就返回 → 看到**发送端**真实分块粒度 |
+| `0` | 攒满 `--max-samples`（默认 1024）或 `--pull-timeout` 才返回 → 看到**接收端**的批量拉取行为 |
+
+CSV 列：`index,pulled_at_s,gap_ms,samples,first_ts,last_ts,span_ms`。
+统计里有 `worst ts gap`：时间戳步长与「上一块样本数 ÷ 采样率」的最大偏差，用来判断是否掉样本。
+
+**交叉实测**（真机 67 通道 @ 2000 Hz，8 秒，`min_samples=1`）：
+
+| 发送端 | 接收端 | pulls | 样本/秒 | 每次样本 mean / p95 / max | pull 间隔 mean / p95 | 时间戳最大偏差 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 3.11 | 3.11 | 499 | 2004 | 28.7 / 36 / 48 | 14.34 / 21.31 ms | 19.7 ms |
+| 3.10 | 3.10 | 443 | 1998 | 31.4 / 62 / 79 | 15.77 / 30.86 ms | 29.8 ms |
+| 3.11 | 3.10 | 466 | 2005 | 30.5 / 38 / 64 | 15.23 / 21.29 ms | 21.5 ms |
+| 3.10 | 3.11 | 466 | 2000 | 31.6 / 57 / 72 | 15.83 / 31.31 ms | 30.4 ms |
+
+结论：
+
+* 四个组合的**吞吐都是 ~2000 样本/秒**，没有丢数；
+* 分块的**抖动跟发送端版本走**（3.11 发送端 p95 36–38 样本，3.10 发送端 57–62），与接收端无关；
+* 中位数都是 ~32 样本（≈16 ms），说明 liblsl 交付给 Python 的粒度约 15 ms，比发送端 ~10.8 ms 的推送间隔更粗；
+* 3.10 发送端偶发 ~30 ms 的交付间隔（≈60 样本），即下游会看到轻微的时间戳"台阶"，但不影响总样本数。
+
 ## 无硬件演练（`--simulate`）
 
 没有设备时，`--simulate` 用内置的模拟设备跑**完整链路**（通道配置 → LSL outlet → 数据推送）：
