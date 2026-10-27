@@ -55,6 +55,8 @@ def _reference_label(reference: dict | None) -> str:
     if not method:
         return ""
     auto = str(reference.get("autoreference") or "").lower()
+    if method == "common" and auto == "fixed":
+        return "参考 common（CREF 单独参考，不自动切换）"
     detail = _REFERENCE_DETAIL.get(method, method)
     text = f"参考 {method}（{detail}）"
     if auto:

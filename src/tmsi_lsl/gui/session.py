@@ -166,7 +166,7 @@ class DeviceSession(QObject):
 
             # Keep every UNI channel referenced to the CREF electrode: no average
             # reference, and no silent fallback when CREF comes loose.
-            references = source.ensure_reference("common", auto="fixed")
+            references = source.ensure_reference()
 
             stream = LslStream(
                 name=str(config.get("lsl_name") or "TMSi SAGA"),

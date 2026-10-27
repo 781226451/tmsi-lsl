@@ -273,16 +273,18 @@ uv run tmsi-lsl --channels "type:UNI" --base-sample-rate 4096 --divider 2
 
 ### 参考方式（REF）
 
-参考方式**固定为 `common` + `fixed`**，不提供命令行开关：
+参考方式**在代码里固定为 `common` + `fixed`**，命令行和界面都不提供切换：
 
 * `common`：每个 UNI 通道相对 **CREF 电极**（单独参考），**不使用公共平均参考**；
 * `fixed`：CREF 电极松动时**也不会**自动切换参考方式（避免数据含义悄悄改变）。
 
+常量定义在 `tmsi_lsl.saga_source`：`REFERENCE_METHOD = "common"`、`AUTO_REFERENCE_METHOD = "fixed"`。
 设备一致时程序**不写任何配置**；只有设备被设成别的参考方式时，才会在开始推流前纠正一次。
-**参考模式只在 GUI 顶部显示**（`参考 common（CREF 单独参考）· 自动回退 fixed`），消息面板同时记一条；
+**参考模式只在 GUI 顶部显示**（`参考 common（CREF 单独参考，不自动切换）`），消息面板同时记一条；
 CLI 不打印这一行。
 
-> 需要程序化查看/修改时用 `SagaSource.reference()` / `SagaSource.ensure_reference("common", auto="fixed")`。
+> 程序化接口也只有一个无参调用：`SagaSource.ensure_reference()`（固定写入 common/fixed），
+> `SagaSource.reference()` 用于读取设备当前值。没有任何参数可以选到 average。
 
 概念上参考有两个维度（仅供理解，本程序只用第一种组合）：
 

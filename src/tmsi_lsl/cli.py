@@ -516,7 +516,7 @@ def _run(args: argparse.Namespace) -> int:
         # electrode, with no silent fallback to an average reference.  The value
         # is only surfaced in the GUI, not printed here.
         try:
-            source.ensure_reference("common", auto="fixed")
+            source.ensure_reference()
         except SourceError as exc:
             raise SourceError(f"could not pin the reference: {exc}") from exc
 
