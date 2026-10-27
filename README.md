@@ -15,8 +15,8 @@
 
 ```
 .
-├── pyproject.toml              # uv 项目定义（Python 3.10）
-├── .python-version             # 3.10
+├── pyproject.toml              # uv 项目定义（Python 3.11）
+├── .python-version             # 3.11
 ├── settings.example.toml       # 设置文件示例（可直接复制为 settings.toml）
 ├── src/tmsi_lsl/
 │   ├── cli.py                  # 命令行入口（连接 → 选通 → 采样 → LSL）
@@ -24,6 +24,7 @@
 │   ├── saga_source.py          # 设备发现/打开/通道配置/启动停止的封装
 │   ├── channels.py             # 通道列表、选通语法解析与选择逻辑（不依赖 SDK）
 │   ├── lsl_stream.py           # 基于 SDK LSLWriter 的 LSL outlet + 吞吐统计
+│   ├── timing.py               # 取数间隔记录（包装 get_device_data，不改 SDK）
 │   ├── simulator.py            # 无硬件时的模拟 SAGA 设备
 │   ├── sdk_bootstrap.py        # 定位并加载 tmsi-python-interface-main
 │   └── gui/                    # Qt Quick 图形界面
@@ -35,6 +36,7 @@
 ├── tests/                      # 单元测试 + LSL 端到端 + GUI 自检
 ├── scripts/
 │   ├── probe_connections.py    # 逐个接口组合探测设备（排查“找不到设备”）
+│   ├── sleep_precision.py      # 对比 time.sleep 精度（3.10 vs 3.11 / 有无 LSL）
 │   └── gui_screenshot.py       # 无显示器渲染界面截图
 ├── docs/                       # 界面截图
 └── tmsi-python-interface-main/ # 官方 TMSi Python Interface（未修改）
@@ -45,7 +47,7 @@
 | 项目 | 说明 |
 | --- | --- |
 | 操作系统 | Windows（TMSi 驱动只有 Windows 版本） |
-| Python | 3.10（由 `uv` 自动安装/管理） |
+| Python | 3.11（由 `uv` 自动安装/管理） |
 | uv | `uv 0.13+` |
 | TMSi 驱动 | **必须在目标机器上安装**，DLL 固定位于 `C:\Program Files\TMSi\Saga\TMSiSagaDeviceLib.dll` |
 | Python 包源 | 默认使用**清华 PyPI 镜像**（见下节），无需代理即可快速安装依赖 |
@@ -55,7 +57,7 @@
 ## 快速开始
 
 ```powershell
-# 1. 创建虚拟环境并安装依赖（自动下载 CPython 3.10）
+# 1. 创建虚拟环境并安装依赖（自动下载 CPython 3.11）
 uv sync
 
 # 2. 自检：SDK 位置、驱动 DLL、pylsl、设备发现
@@ -190,7 +192,7 @@ $env:UV_DEFAULT_INDEX = "https://pypi.tuna.tsinghua.edu.cn/simple"   # 仅当前
 ```
 
 > 说明：uv 从 GitHub 下载 CPython 解释器，这一步不走 PyPI 镜像；如果不想让 uv 联网装解释器，
-> 加上 `--no-python-downloads`（本机已有 3.10 时 uv 会直接复用）。
+> 加上 `--no-python-downloads`（本机已有 3.11 时 uv 会直接复用）。
 
 ## 选通通道（`--channels`）
 
@@ -273,6 +275,52 @@ uv run tmsi-lsl --channels "type:UNI" --base-sample-rate 4096 --divider 2
 
 > **注意**：LSL 流只能声明一个采样率。如果不同通道类型的 divider 不同（例如 UNI 500 Hz、status 4000 Hz），
 > 程序会给出告警，因为下游会按单一采样率解释多路数据。需要严格对齐时请统一使用 `--divider`。
+
+## 取数间隔诊断（`--record-timing`）
+
+SDK 的采样线程按 `TMSiThread(pause=0.01)` 每 10 ms 调一次 `device.get_device_data()`。
+`--record-timing FILE.csv` 会在**不修改 vendor SDK** 的前提下包装该方法（只替换设备实例上的属性），
+记录每次调用的开始时刻、耗时、与上一次的间隔、以及本次返回的 sample set 数，退出时打印统计：
+
+```powershell
+uv run tmsi-lsl --duration 30 --record-timing timing.csv
+```
+
+```
+SDK data fetch timing
+  fetches       : 467 over 5.028 s (92.7 Hz)
+  interval (ms) : mean 10.79  p50 10.97  p95 11.10  p99 11.33  max 11.56  min 10.03
+  call (ms)     : mean 0.02  p95 0.04  max 0.10
+  sample sets   : 9,112 total (156 empty fetches)
+  csv           : timing.csv
+```
+
+CSV 列：`index,t_start_s,duration_ms,interval_ms,num_sets`（间隔为空表示第一次调用）。
+也可以编程调用：`recorder = source.enable_fetch_timing("timing.csv")`（须在 `start()` 之前）。
+
+### Python 3.10 与 3.11 的 `time.sleep` 精度
+
+Windows 上 CPython ≤ 3.10 会把 `time.sleep()` 向上取整到 ~15.6 ms 的系统节拍，3.11 改用高精度可等待定时器：
+
+| `time.sleep` | 3.10.22 空进程 | 3.10.22 + LSL outlet | 3.11.17 空进程 |
+| --- | --- | --- | --- |
+| 1 ms | **15.74 ms** | — | 1.53 ms |
+| 5 ms | **15.75 ms** | — | 5.36 ms |
+| 10 ms | **15.76 ms** | 10.26 ms | 10.34 ms |
+
+**但本程序在两个版本上几乎没有差别**：`pylsl` 创建 `StreamOutlet` 后（liblsl 的线程）会把进程定时器精度提升到 1 ms，
+所以采样线程实测为 —— 真机 5 秒：Python 3.11 → 92.7 Hz / 平均 10.79 ms，Python 3.10 → 91.1 Hz / 平均 10.98 ms，
+两者 LSL 帧率都稳定在 ~2000 帧/秒。
+
+如果想复现上面两组对比：
+
+```powershell
+uv run python scripts/sleep_precision.py                                   # 当前解释器（无 LSL）
+uv run --python 3.10 --no-project --with pylsl python scripts/sleep_precision.py --outlet
+```
+
+> 也就是说：**空脚本里 3.10 的 sleep 确实差 5.4 ms，但在本程序里被 LSL outlet 掩盖了**。
+> 若以后有路径在建模/取数时尚未创建 outlet（例如只用 SDK 不推流），3.10 上仍会遇到 ~15.6 ms 的节拍。
 
 ## 无硬件演练（`--simulate`）
 
@@ -397,7 +445,7 @@ SDK 的 `TMSiFileFormats/file_formats/__init__.py` 会一次性导入 Poly5 / XD
 以后要导出 poly5/xdf，直接 `uv add pandas scipy EDFlib-Python` 即可，导入逻辑会自动走完整包。
 
 **GUI 依赖了哪些包**
-`pyside6-essentials`（Qt Quick / Quick Controls，不含 WebEngine 等附加模块）+ `tomli`（Python 3.10 读取 TOML）。
+`pyside6-essentials`（Qt Quick / Quick Controls，不含 WebEngine 等附加模块）+ `tomli`（Python 3.10 读取 TOML；3.11 起可用内置 `tomllib`）。
 没有使用 `pyside6` 元包，因为它会额外拉入 WebEngine、Addons 等约 160 MB 用不到的模块。
 
 **启动时 stderr 出现 `netinterfaces.cpp ... INFO| netif ...`**
@@ -410,7 +458,7 @@ SDK 的 `TMSiFileFormats/file_formats/__init__.py` 会一次性导入 Poly5 / XD
 
 ```powershell
 uv sync                       # 含 pytest
-uv run pytest                 # 90 个测试：设置/选通/模型/矩阵交互/端到端 LSL/GUI 自检
+uv run pytest                 # 97 个测试：设置/选通/模型/矩阵交互/端到端 LSL/GUI 自检
 
 # 界面无显示器自检（加载真实 QML，跑一遍模拟推流）
 uv run tmsi-lsl-gui --self-test

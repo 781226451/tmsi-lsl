@@ -7,10 +7,12 @@ predictable ordering and friendlier error messages.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Sequence
 
 from . import sdk_bootstrap
 from .channels import ChannelInfo
+from .timing import FetchTimingRecorder, instrument_device
 
 __all__ = [
     "SagaSource",
@@ -156,6 +158,7 @@ class SagaSource:
         self._summary: DeviceSummary | None = None
         self._sampling = False
         self._discovered = 0
+        self._fetch_recorder: FetchTimingRecorder | None = None
 
     # ------------------------------------------------------------------ state
 
@@ -445,6 +448,35 @@ class SagaSource:
                 f"could not start the measurement ({_tmsi_error_code(exc)}): {exc}"
             ) from exc
         self._sampling = True
+
+    def enable_fetch_timing(
+        self,
+        path: str | Path | None = None,
+        keep: int = 200_000,
+    ) -> FetchTimingRecorder:
+        """Record the timing of every ``get_device_data`` call made by the SDK.
+
+        Must be called after :meth:`connect` and before :meth:`start`; the
+        vendored SDK is not modified (only the device instance's attribute is
+        wrapped).  :paramref:`path` receives a CSV row per call.
+        """
+        device = self._require_device()
+        if self._sampling:
+            raise SourceError("enable fetch timing before start()")
+        if not hasattr(device, "get_device_data"):
+            raise SourceError(
+                "this device object has no get_device_data(); the simulator does "
+                "not fetch through the SDK either, so there is nothing to record"
+            )
+        recorder = FetchTimingRecorder(path, keep)
+        instrument_device(device, recorder)
+        self._fetch_recorder = recorder
+        return recorder
+
+    @property
+    def fetch_recorder(self) -> FetchTimingRecorder | None:
+        """The recorder created by :meth:`enable_fetch_timing`, if any."""
+        return self._fetch_recorder
 
     def stop(self) -> None:
         """Stop signal acquisition."""
