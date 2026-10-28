@@ -1,7 +1,7 @@
 @echo off
 rem ---------------------------------------------------------------------------
-rem  TMSi SAGA -> LSL : double-click launcher for the Qt Quick interface.
-rem  Extra arguments are forwarded, e.g.  run-gui.cmd --settings lab.toml
+rem  TMSi SAGA -> LSL : console launcher (shows logs; run-gui.vbs is the silent one).
+rem  Extra arguments are forwarded, e.g.  run-gui-console.cmd --settings lab.toml
 rem ---------------------------------------------------------------------------
 setlocal
 cd /d "%~dp0"

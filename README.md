@@ -18,7 +18,8 @@
 ├── pyproject.toml              # uv 项目定义（Python 3.11）
 ├── .python-version             # 3.11
 ├── settings.example.toml       # 设置文件示例（可直接复制为 settings.toml）
-├── run-gui.cmd                 # 一键启动界面（双击运行）
+├── run-gui.vbs                 # 一键启动界面（双击，无控制台窗口）
+├── run-gui-console.cmd         # 同上，但保留控制台显示日志（排查用）
 ├── src/tmsi_lsl/
 │   ├── cli.py                  # 命令行入口（连接 → 选通 → 采样 → LSL）
 │   ├── settings.py             # TOML 设置的读写/校验（不依赖 Qt）
@@ -93,24 +94,38 @@ uv run tmsi-lsl-gui --settings lab.toml   # 指定设置文件
 
 ### 一键启动（Windows）
 
-**方式一：双击仓库根目录的 `run-gui.cmd`**
+**方式一：双击 `run-gui.vbs`（推荐，无控制台窗口）**
 
-会出现一个控制台窗口（显示启动日志与错误信息），界面关闭后自动退出；参数会透传：
+`run-gui.vbs` 直接调用 `.venv\Scripts\pythonw.exe` 启动界面——双击后只有 Qt 窗口出现，
+**不会弹出黑色控制台**；参数同样透传：
 
 ```powershell
-run-gui.cmd                      # 使用 ./settings.toml
-run-gui.cmd --settings lab.toml  # 指定设置文件
+run-gui.vbs --settings lab.toml
 ```
 
-**方式二：桌面快捷方式（无控制台窗口）**
+**方式二：桌面快捷方式**
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\create_gui_shortcut.ps1
 ```
 
-会在桌面创建 **`TMSi SAGA - LSL`** 图标：直接调用 `.venv\Scripts\pythonw.exe`，
-双击即打开界面、不弹黑色窗口。依赖更新后先运行一次 `uv sync`（或 `run-gui.cmd`），
+会在桌面创建 **`TMSi SAGA - LSL`** 图标：同样调用 `.venv\Scripts\pythonw.exe`，
+双击即打开界面、不弹窗口。依赖更新后先运行一次 `uv sync`（或 `run-gui-console.cmd`），
 快捷方式本身不需要重建。
+
+**方式三：`run-gui-console.cmd`（排查问题时用）**
+
+`.cmd` 是控制台程序，双击**必然**带一个黑色窗口——所以它只作为诊断入口保留：
+能看到启动日志、`uv sync` 的输出和完整报错，界面关闭后窗口自动退出。
+首次运行或界面打不开时用它：
+
+```powershell
+run-gui-console.cmd
+run-gui-console.cmd --self-test      # 无窗口自检
+```
+
+> 如果双击 `.vbs` 被安全策略拦下（部分单位禁用 Windows Script Host），
+> 直接使用方式二的桌面快捷方式，它不依赖脚本宿主。
 
 > 界面截图保存在本地 `docs/` 目录，**不随仓库分发**（其中含真实设备序列号）。
 > 可用 `scripts/gui_screenshot.py` 在本地重新生成。

@@ -15,6 +15,7 @@
 # Windows-only launchers keep CRLF
 *.bat  text eol=crlf
 *.cmd  text eol=crlf
+*.vbs  text eol=crlf
 *.ps1  text eol=crlf
 
 # Binaries
