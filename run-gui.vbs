@@ -33,4 +33,4 @@ For i = 0 To args.Count - 1
 Next
 
 shell.CurrentDirectory = repo
-shell.Run commandLine, 0, False
+shell.Run commandLine, 1, False
