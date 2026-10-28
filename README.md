@@ -18,6 +18,7 @@
 ├── pyproject.toml              # uv 项目定义（Python 3.11）
 ├── .python-version             # 3.11
 ├── settings.example.toml       # 设置文件示例（可直接复制为 settings.toml）
+├── run-gui.cmd                 # 一键启动界面（双击运行）
 ├── src/tmsi_lsl/
 │   ├── cli.py                  # 命令行入口（连接 → 选通 → 采样 → LSL）
 │   ├── settings.py             # TOML 设置的读写/校验（不依赖 Qt）
@@ -35,6 +36,7 @@
 ├── tests/                      # 单元测试 + LSL 端到端 + GUI 自检
 ├── scripts/
 │   ├── probe_connections.py    # 逐个接口组合探测设备（排查“找不到设备”）
+│   ├── create_gui_shortcut.ps1 # 创建桌面快捷方式（无控制台启动）
 │   └── gui_screenshot.py       # 无显示器渲染界面截图
 ├── docs/                       # 本地界面截图（不入库）
 └── tmsi-python-interface-main/ # 官方 TMSi Python Interface（未修改）
@@ -88,6 +90,27 @@ uv run tmsi-lsl --channels "type:UNI" --duration 30
 uv run tmsi-lsl-gui                       # 使用 ./settings.toml
 uv run tmsi-lsl-gui --settings lab.toml   # 指定设置文件
 ```
+
+### 一键启动（Windows）
+
+**方式一：双击仓库根目录的 `run-gui.cmd`**
+
+会出现一个控制台窗口（显示启动日志与错误信息），界面关闭后自动退出；参数会透传：
+
+```powershell
+run-gui.cmd                      # 使用 ./settings.toml
+run-gui.cmd --settings lab.toml  # 指定设置文件
+```
+
+**方式二：桌面快捷方式（无控制台窗口）**
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\create_gui_shortcut.ps1
+```
+
+会在桌面创建 **`TMSi SAGA - LSL`** 图标：直接调用 `.venv\Scripts\pythonw.exe`，
+双击即打开界面、不弹黑色窗口。依赖更新后先运行一次 `uv sync`（或 `run-gui.cmd`），
+快捷方式本身不需要重建。
 
 > 界面截图保存在本地 `docs/` 目录，**不随仓库分发**（其中含真实设备序列号）。
 > 可用 `scripts/gui_screenshot.py` 在本地重新生成。
